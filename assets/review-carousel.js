@@ -1,9 +1,8 @@
 (() => {
   "use strict";
-  const interval = 3000;
   const motion = matchMedia("(prefers-reduced-motion: reduce)");
 
-  function autoplay(region, advance, canAdvance) {
+  function autoplay(region, advance, canAdvance, interval) {
     let visible = false;
     let held = false;
     let timer;
@@ -40,7 +39,7 @@
       const index = slides.findIndex(slide => slide.checked);
       slides[(index + step + slides.length) % slides.length].checked = true;
     }
-    const schedule = autoplay(hero, advanceHero, () => true);
+    const schedule = autoplay(hero, advanceHero, () => true, 3000);
     hero.addEventListener("change", schedule);
     let swipe;
     hero.addEventListener("touchstart", event => {
@@ -62,30 +61,70 @@
   const track = document.getElementById("review-cards");
   const controls = document.querySelector(".review-controls");
   if (!track || !controls || !track.children.length) return;
-  let positions = [];
+  const originals = [...track.children];
+  let first = 0;
+  let stride = 0;
+  let looping = false;
   let hovered = false;
-  const schedule = autoplay(track.closest("section"), advance, () => positions.length > 1 && !hovered);
+  const schedule = autoplay(track.closest("section"), advance, () => looping && !hovered, 2000);
+
+  function copies() {
+    return originals.map(card => {
+      const copy = card.cloneNode(true);
+      copy.dataset.reviewCopy = "";
+      copy.setAttribute("aria-hidden", "true");
+      copy.setAttribute("data-nosnippet", "");
+      copy.querySelectorAll("a").forEach(link => { link.tabIndex = -1; });
+      return copy;
+    });
+  }
+
+  function currentIndex() {
+    if (!stride) return 0;
+    const index = Math.round((track.scrollLeft - first) / stride);
+    return ((index % originals.length) + originals.length) % originals.length;
+  }
 
   function measure() {
-    const limit = track.scrollWidth - track.clientWidth;
-    const start = track.firstElementChild.getBoundingClientRect().left;
-    positions = [0];
-    for (const card of track.children) {
-      const left = Math.min(card.getBoundingClientRect().left - start, limit);
-      if (left > positions.at(-1) + 1) positions.push(left);
+    const index = currentIndex();
+    const columns = Number(getComputedStyle(track).getPropertyValue("--review-columns"));
+    const needsLoop = originals.length > columns;
+    if (needsLoop !== looping) {
+      looping = needsLoop;
+      track.classList.toggle("reviews-loop", looping);
+      if (looping) {
+        track.prepend(...copies());
+        track.append(...copies());
+      } else {
+        track.querySelectorAll("[data-review-copy]").forEach(copy => copy.remove());
+        track.scrollLeft = 0;
+      }
     }
-    controls.hidden = positions.length < 2;
+    controls.hidden = !looping;
+    if (looping) {
+      const left = originals[0].getBoundingClientRect().left;
+      stride = originals[1].getBoundingClientRect().left - left;
+      first = left - track.getBoundingClientRect().left + track.scrollLeft - parseFloat(getComputedStyle(track).scrollPaddingLeft);
+      track.scrollTo({left:first + index * stride, behavior:"instant"});
+    }
     schedule();
   }
 
-  function advance(step) {
-    if (positions.length < 2) return;
-    const current = track.scrollLeft;
-    const next = step > 0 ? positions.find(x => x > current + 2) : positions.findLast(x => x < current - 2);
-    const left = next ?? (step > 0 ? 0 : positions.at(-1));
-    track.scrollTo({left, behavior:motion.matches || next === undefined ? "instant" : "smooth"});
+  function normalize() {
+    if (!looping || !stride) return;
+    const rounded = Math.round((track.scrollLeft - first) / stride);
+    if (rounded < 0 || rounded >= originals.length) {
+      track.scrollTo({left:first + currentIndex() * stride, behavior:"instant"});
+    }
   }
 
+  function advance(step) {
+    if (!looping) return;
+    normalize();
+    track.scrollTo({left:first + (currentIndex() + step) * stride, behavior:motion.matches ? "instant" : "smooth"});
+  }
+
+  track.addEventListener("scrollend", normalize);
   controls.addEventListener("click", event => {
     const button = event.target.closest("button[data-step]");
     if (button) { advance(Number(button.dataset.step)); schedule(); }
