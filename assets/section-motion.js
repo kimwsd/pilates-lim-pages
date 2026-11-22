@@ -3,6 +3,7 @@
   const preference = matchMedia("(prefers-reduced-motion: reduce)");
   const sections = [
     ".door > div", ".lim-main > section:not(.reel)", ".sub-head",
+    ".about-intro", ".about-story", ".about-cards > section",
     ".program-lead", ".program-choices", ".program-notes > section", ".program-cards > a",
     ".reading > :not(.program-cards, .program-notes, .review-board)",
     ".review-filters", ".review-gallery > a", ".review-empty", ".review-results > .story-row", "body > footer"
