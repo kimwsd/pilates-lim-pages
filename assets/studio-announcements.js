@@ -26,11 +26,13 @@ window.renderLimAnnouncements = function renderAnnouncements() {
       try { return new URL(value).href; } catch { return null; }
     }
     if (!/^\/(?!\/)/.test(value)) return null;
+    if (location.hostname === "kimwsd.github.io" && /^\/lim-uploads\/[a-f0-9]{64}\.(webp|png|jpeg)$/.test(value)) return "/pilates-lim-pages/assets/" + value.split("/").pop();
     return location.hostname === "kimwsd.github.io" || location.protocol === "file:"
       ? "https://pilateslim.co.kr" + value : value;
   }
   function appendCopy(parent, item, kind) {
-    const src = linkAddress(item.image);
+    const src = preview && /^data:image\/(?:webp|png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$/.test(item.image)
+      ? item.image : linkAddress(item.image);
     if (src) {
       const image = element("img");
       image.alt = "";
